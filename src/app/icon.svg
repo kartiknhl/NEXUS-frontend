@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <!-- Solid Black Circle -->
+  <circle cx="128" cy="128" r="128" fill="#000000"/>
+  
+  <!-- Sharp Geometric White 'N' -->
+  <path d="M74 180 V76 h30 l48 72 V76 h30 v104 h-30 l-48-72 v72 H74 z" fill="#FFFFFF"/>
+</svg>

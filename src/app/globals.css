@@ -1,0 +1,119 @@
+@import "tailwindcss";
+
+/*
+  NEXUS — "Case Dossier" design system
+  A sovereign forensic instrument: deep ink-navy, a single official gold accent,
+  on-the-record monospace data. Domain colors (flag/jade) are functional, not decorative.
+*/
+@theme {
+  /* Ink — the page and its raised surfaces (blue-black, not neutral) */
+  --color-ink-900: #070a12; /* page base */
+  --color-ink-850: #0a0e1a; /* base alt / classification strip */
+  --color-ink-800: #0d1220; /* panel */
+  --color-ink-750: #111726; /* raised panel, inputs */
+  --color-ink-700: #161d2e; /* hover */
+
+  /* Hairlines */
+  --color-line: #1e2739;
+  --color-line-strong: #2a3550;
+
+  /* Paper — text on ink */
+  --color-paper: #eef1f7; /* primary */
+  --color-muted: #97a0b2; /* body */
+  --color-faint: #626c81; /* labels, captions */
+
+  /* Signature: official gold (seals, flags, primary action) */
+  --color-seal: #e0a22c;
+  --color-seal-bright: #f2b843;
+
+  /* Functional domain colors */
+  --color-flag: #e5484d; /* suspect / alert */
+  --color-jade: #2fa98a; /* VASP / resolved */
+  --color-jade-bright: #3ec6a2; /* hover for jade actions */
+  --color-wire: #4c6a99; /* ledger flow lines */
+
+  /* Type roles — bound to next/font variables set on <html> */
+  --font-display: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+body {
+  background-color: var(--color-ink-900);
+  color: var(--color-paper);
+  font-family: var(--font-sans);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--color-seal);
+  color: var(--color-ink-900);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-seal);
+  outline-offset: 2px;
+}
+
+/* Faint ledger grid used behind hero / graph */
+.dossier-grid {
+  background-image:
+    linear-gradient(to right, rgba(124, 145, 185, 0.045) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(124, 145, 185, 0.045) 1px, transparent 1px);
+  background-size: 60px 60px;
+}
+
+/* A thin double top rule, like the header of an official form */
+.rule-seal {
+  background-image: linear-gradient(
+    to right,
+    transparent,
+    var(--color-seal) 20%,
+    var(--color-seal) 80%,
+    transparent
+  );
+}
+
+/* The "FLAGGED FOR SEIZURE" evidence stamp */
+.evidence-stamp {
+  border: 2px solid var(--color-seal);
+  color: var(--color-seal);
+  letter-spacing: 0.22em;
+  box-shadow: inset 0 0 0 1px rgba(224, 162, 44, 0.25);
+}
+
+@keyframes seal-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(224, 162, 44, 0.45);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(224, 162, 44, 0);
+  }
+}
+.seal-pulse {
+  animation: seal-pulse 2.6s ease-out infinite;
+}
+
+@keyframes flow {
+  to {
+    stroke-dashoffset: -16;
+  }
+}
+.wire-flow {
+  stroke-dasharray: 4 4;
+  animation: flow 0.9s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
