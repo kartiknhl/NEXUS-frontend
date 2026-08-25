@@ -531,7 +531,7 @@ function NexusDashboard() {
           );
         } else if (err instanceof TypeError) {
           setError(
-            "Can't reach the forensic engine at 127.0.0.1:8000. Start the backend, then retry."
+            `Can't reach the forensic engine at ${process.env.NEXT_PUBLIC_API_URL || "127.0.0.1:8000"}. Start the backend, then retry.`
           );
         } else {
           setError(err instanceof Error ? err.message : "Unable to fetch trace data.");
