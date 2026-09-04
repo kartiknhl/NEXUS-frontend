@@ -39,7 +39,16 @@ type GraphEdge = {
   target: string;
   label?: string;
   asset?: string;
+  hash?: string;
+  hop?: number;
 };
+
+async function computeEvidenceHash(data: unknown) {
+  const msgUint8 = new TextEncoder().encode(JSON.stringify(data));
+  const hashBuffer = await crypto.subtle.digest("SHA-256", msgUint8);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+}
 
 type TerminalVasp = {
   matched_address?: string;
@@ -193,6 +202,8 @@ const normalizeGraphData = (rawGraph: unknown) => {
             edgeData.asset ?? edgeData.token ?? edgeData.symbol ?? edgeData.label,
             ""
           ),
+          hash: asString(edgeData.hash ?? edgeData.tx_hash ?? edgeData.transaction_hash, ""),
+          hop: asNumber(edgeData.hop) ?? index + 1,
         };
       })
       .filter(Boolean) as GraphEdge[],
@@ -625,14 +636,13 @@ function NexusDashboard() {
     setExporting(true);
     setExportError(null);
     try {
-      await generateSection94Notice(
-        {
-          target: meta.target,
-          hops: meta.hops,
-          terminalVasp: meta.terminalVasp,
-        },
-        caseData
-      );
+      const traceData = {
+        target: meta.target,
+        hops: meta.hops,
+        terminalVasp: meta.terminalVasp,
+      };
+      const evidenceHash = await computeEvidenceHash({ traceData, caseData });
+      await generateSection94Notice(traceData, caseData, evidenceHash);
       setShowModal(false);
     } catch (err) {
       setExportError(
@@ -647,6 +657,17 @@ function NexusDashboard() {
 
   const vaspFound = Boolean(meta?.terminalVasp);
   const hasGraph = graphData.nodes.length > 0;
+  const ledgerEntries = useMemo(
+    () =>
+      graphData.edges.map((edge, index) => ({
+        hop: edge.hop ?? index + 1,
+        asset: edge.asset || "UNKNOWN",
+        from: edge.source,
+        to: edge.target,
+        hash: edge.hash || edge.id,
+      })),
+    [graphData.edges]
+  );
 
   const statusPill = loading
     ? { text: "Tracing", cls: "border-seal/40 bg-seal/10 text-seal" }
@@ -936,6 +957,112 @@ function NexusDashboard() {
                 )}
               </div>
             </section>
+
+            {ledgerEntries.length > 0 && (
+              <section className="border border-line bg-ink-800">
+                <header className="border-b border-line px-5 py-3.5">
+                  <h2 className="font-mono text-[10.5px] uppercase tracking-[0.2em] text-faint">
+                    Evidentiary Transaction Ledger
+                  </h2>
+                </header>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[760px] border-collapse text-left">
+                    <thead className="bg-[#111827] text-[#9CA3AF]">
+                      <tr className="border-b border-[#374151]">
+                        <th className="px-4 py-3 font-mono text-[10px] font-bold uppercase tracking-[0.16em]">
+                          Hop #
+                        </th>
+                        <th className="px-4 py-3 font-mono text-[10px] font-bold uppercase tracking-[0.16em]">
+                          Asset
+                        </th>
+                        <th className="px-4 py-3 font-mono text-[10px] font-bold uppercase tracking-[0.16em]">
+                          Source (From)
+                        </th>
+                        <th className="px-4 py-3 font-mono text-[10px] font-bold uppercase tracking-[0.16em]">
+                          Recipient (To)
+                        </th>
+                        <th className="px-4 py-3 font-mono text-[10px] font-bold uppercase tracking-[0.16em]">
+                          Transaction Hash
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {ledgerEntries.map((entry, index) => {
+                        const fromKey = `from-${entry.from}-${index}`;
+                        const toKey = `to-${entry.to}-${index}`;
+                        const hashKey = `tx-${entry.hash}-${index}`;
+                        const isMatchedRecipient =
+                          entry.to.toLowerCase() === (meta?.terminalVasp?.matched_address ?? "").toLowerCase();
+                        const txExplorer =
+                          detectChain(entry.from) === "Tron" || detectChain(entry.to) === "Tron"
+                            ? `https://tronscan.org/#/transaction/${entry.hash}`
+                            : `https://etherscan.io/tx/${entry.hash}`;
+
+                        return (
+                          <tr key={`${entry.hash || entry.from}-${index}`} className="border-b border-[#374151] bg-[#111827]/40">
+                            <td className="px-4 py-3 font-mono text-[12px] text-paper">
+                              Hop {entry.hop}
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="inline-flex rounded border border-[#374151] bg-[#1F2937] px-2 py-1 font-mono text-[11px] text-paper">
+                                {entry.asset.toUpperCase()}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => copy(entry.from, fromKey)}
+                                  title="Copy source address"
+                                  className="font-mono text-[12px] text-paper transition-colors hover:text-seal"
+                                >
+                                  {copied === fromKey ? "Copied!" : shortenHash(entry.from, 6, 4)}
+                                </button>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => copy(entry.to, toKey)}
+                                  title="Copy recipient address"
+                                  className={`font-mono text-[12px] transition-colors ${
+                                    isMatchedRecipient ? "text-jade hover:text-jade-bright" : "text-paper hover:text-seal"
+                                  }`}
+                                >
+                                  {copied === toKey ? "Copied!" : shortenHash(entry.to, 6, 4)}
+                                </button>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => copy(entry.hash, hashKey)}
+                                  title="Copy transaction hash"
+                                  className="font-mono text-[12px] text-paper transition-colors hover:text-seal"
+                                >
+                                  {copied === hashKey ? "Copied!" : shortenHash(entry.hash, 8, 6)}
+                                </button>
+                                <a
+                                  href={txExplorer}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  aria-label={`Open transaction on explorer`}
+                                  className="inline-flex h-5 w-5 items-center justify-center rounded border border-[#374151] text-[10px] text-[#9CA3AF] transition-colors hover:border-seal hover:text-seal"
+                                >
+                                  ↗
+                                </a>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            )}
 
             {/* ---- terminal VASP / seizure ---- */}
             {!loading && !error && (
