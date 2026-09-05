@@ -57,6 +57,17 @@ body {
   outline-offset: 2px;
 }
 
+.spotlight-input:focus,
+.spotlight-input:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.spotlight-input::selection {
+  background: #cbd5e1;
+  color: #0f172a;
+}
+
 /* Faint ledger grid used behind hero / graph */
 .dossier-grid {
   background-image:

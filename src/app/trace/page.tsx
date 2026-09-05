@@ -5,7 +5,6 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type cytoscape from "cytoscape";
-import { SiteNav } from "@/components/brand";
 import { generateSection94Notice, type CaseData } from "@/lib/section94";
 import { caseReference, detectChain, shortenHash } from "@/lib/utils";
 
@@ -19,7 +18,7 @@ const CytoscapeGraph = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="flex h-[640px] items-center justify-center bg-ink-850 font-mono text-[11px] uppercase tracking-[0.2em] text-faint">
+      <div className="flex h-[640px] items-center justify-center bg-white font-mono text-[11px] uppercase tracking-[0.2em] text-slate-500">
         Initializing renderer…
       </div>
     ),
@@ -40,6 +39,8 @@ type GraphEdge = {
   label?: string;
   asset?: string;
   hash?: string;
+  valueRaw?: string;
+  timestamp?: string;
   hop?: number;
 };
 
@@ -93,30 +94,30 @@ const graphStyles: cytoscape.StylesheetJsonBlock[] = [
       width: 52,
       height: 52,
       label: "data(short)",
-      color: "#eef1f7",
+      color: "#0F172A",
       "font-size": "12px",
       "font-weight": "500" as never,
       "font-family": "var(--font-plex-mono), ui-monospace, monospace",
       "text-valign": "bottom",
       "text-margin-y": 9,
-      "text-background-color": "#0d1220",
-      "text-background-opacity": 0.96,
-      "text-background-padding": "5px",
+      "text-background-color": "#FFFFFF",
+      "text-background-opacity": 0.9,
+      "text-background-padding": "4px",
       "text-background-shape": "roundrectangle",
-      "text-border-color": "#1e2739",
+      "text-border-color": "#E2E8F0",
       "text-border-width": 1,
       "text-border-opacity": 1,
       "border-width": 2,
-      "border-color": "#4c6a99",
-      "background-color": "#1a2334",
+      "border-color": "#94A3B8",
+      "background-color": "#F8FAFC",
       shape: "round-rectangle",
     },
   },
   {
     selector: "node[type = 'suspect']",
     style: {
-      "background-color": "#e5484d",
-      "border-color": "#f4a6a8",
+      "background-color": "#FEF2F2",
+      "border-color": "#EF4444",
       "border-width": 3,
       width: 58,
       height: 58,
@@ -125,17 +126,17 @@ const graphStyles: cytoscape.StylesheetJsonBlock[] = [
   {
     selector: "node[type = 'intermediary']",
     style: {
-      "background-color": "#26324a",
-      "border-color": "#4c6a99",
+      "background-color": "#F8FAFC",
+      "border-color": "#94A3B8",
       "border-width": 2,
     },
   },
   {
     selector: "node[type = 'vasp']",
     style: {
-      "background-color": "#2fa98a",
-      "border-color": "#e0a22c",
-      "border-width": 4,
+      "background-color": "#ECFDF5",
+      "border-color": "#10B981",
+      "border-width": 3,
       width: 64,
       height: 64,
       shape: "round-rectangle",
@@ -145,19 +146,22 @@ const graphStyles: cytoscape.StylesheetJsonBlock[] = [
     selector: "edge",
     style: {
       width: 2.5,
-      "line-color": "#4c6a99",
-      "target-arrow-color": "#4c6a99",
+      "line-color": "#94A3B8",
+      "target-arrow-color": "#94A3B8",
       "target-arrow-shape": "triangle",
       "arrow-scale": 1.3,
       "curve-style": "bezier",
       label: "data(asset)",
-      color: "#97a0b2",
+      color: "#334155",
       "font-size": "11px",
       "font-family": "var(--font-plex-mono), ui-monospace, monospace",
-      "text-background-color": "#070a12",
-      "text-background-opacity": 0.9,
+      "text-background-color": "#F8FAFC",
+      "text-background-opacity": 1,
       "text-background-padding": "4px",
       "text-background-shape": "roundrectangle",
+      "text-border-color": "#E2E8F0",
+      "text-border-width": 1,
+      "text-border-opacity": 1,
       "text-rotation": "autorotate",
     },
   },
@@ -203,6 +207,11 @@ const normalizeGraphData = (rawGraph: unknown) => {
             ""
           ),
           hash: asString(edgeData.hash ?? edgeData.tx_hash ?? edgeData.transaction_hash, ""),
+          valueRaw: asString(edgeData.value_raw ?? edgeData.value ?? edgeData.amount, ""),
+          timestamp: asString(
+            edgeData.timestamp ?? edgeData.timeStamp ?? edgeData.block_timestamp,
+            ""
+          ),
           hop: asNumber(edgeData.hop) ?? index + 1,
         };
       })
@@ -217,10 +226,10 @@ const normalizeGraphData = (rawGraph: unknown) => {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-3 py-2.5">
-      <span className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-faint">
+      <span className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-slate-500">
         {label}
       </span>
-      <span className="min-w-0 truncate font-mono text-[12.5px] text-paper">
+      <span className="min-w-0 truncate font-mono text-[12.5px] text-slate-600">
         {children}
       </span>
     </div>
@@ -228,9 +237,41 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 function typeDot(type: string) {
-  if (type === "suspect") return "bg-flag";
-  if (type === "vasp") return "bg-jade";
-  return "bg-wire";
+  if (type === "suspect") return "bg-red-500";
+  if (type === "vasp") return "bg-emerald-500";
+  return "bg-slate-400";
+}
+
+function formatLedgerAmount(valueRaw: string, asset: string) {
+  if (!valueRaw) return "—";
+  const raw = Number(valueRaw);
+  if (!Number.isFinite(raw)) return valueRaw;
+  const normalizedAsset = asset.toUpperCase();
+  const decimals = normalizedAsset === "ETH" ? 18 : normalizedAsset === "USDT" ? 6 : 0;
+  const amount = raw / 10 ** decimals;
+  return `${amount.toLocaleString("en-US", {
+    maximumFractionDigits: decimals,
+  })} ${normalizedAsset}`;
+}
+
+function formatLedgerDate(timestamp: string) {
+  if (!timestamp) return "—";
+  const numeric = Number(timestamp);
+  const date = new Date(
+    Number.isFinite(numeric)
+      ? numeric < 10_000_000_000
+        ? numeric * 1000
+        : numeric
+      : timestamp
+  );
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 function draftNotice(meta: TraceMeta, openedAt: string) {
@@ -357,7 +398,7 @@ function CaseMetadataModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink-900/80 p-4 py-10 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 py-10 backdrop-blur-sm"
       onClick={() => {
         if (!busy) onCancel();
       }}
@@ -368,19 +409,19 @@ function CaseMetadataModal({
         aria-modal="true"
         aria-labelledby="case-modal-title"
         onClick={(event) => event.stopPropagation()}
-        className="w-full max-w-[430px] border border-line-strong bg-ink-800 shadow-[0_24px_60px_-12px_rgba(0,0,0,0.8)]"
+        className="w-full max-w-[430px] rounded-xl border border-slate-200 bg-white shadow-xl shadow-slate-300/50"
       >
-        <header className="border-b border-line px-5 py-4">
-          <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-seal">
+        <header className="border-b border-slate-200 px-5 py-4">
+          <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-blue-600">
             Chain of custody
           </p>
           <h2
             id="case-modal-title"
-            className="mt-1.5 font-display text-lg font-bold tracking-tight text-paper"
+            className="mt-1.5 text-lg font-bold tracking-tight text-slate-900"
           >
             Case &amp; officer particulars
           </h2>
-          <p className="mt-2 text-[12.5px] leading-5 text-muted">
+          <p className="mt-2 text-[12.5px] leading-5 text-slate-600">
             Printed on the order to {entity} and recorded against {caseRef}.
           </p>
         </header>
@@ -394,7 +435,7 @@ function CaseMetadataModal({
           <div className="space-y-3.5 px-5 py-5">
             {CASE_FIELDS.map((field, index) => (
               <label key={field.key} className="block">
-                <span className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.16em] text-faint">
+                <span className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.16em] text-slate-500">
                   {field.label}
                 </span>
                 <input
@@ -408,34 +449,34 @@ function CaseMetadataModal({
                   autoComplete="off"
                   spellCheck={false}
                   disabled={busy}
-                  className="w-full border border-line-strong bg-ink-900 px-3 py-2 font-mono text-[12.5px] text-paper placeholder:text-faint/60 focus:border-seal focus:outline-none disabled:opacity-60"
+                  className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 font-mono text-[12.5px] text-slate-900 placeholder:text-slate-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-600 disabled:opacity-60"
                 />
               </label>
             ))}
-            <p className="pt-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-faint">
+            <p className="pt-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-slate-500">
               Blank fields print as a dash
             </p>
           </div>
 
           {error && (
-            <p className="mx-5 mb-4 border border-flag/40 bg-flag/5 px-3 py-2 font-mono text-[11px] leading-5 text-flag">
+            <p className="mx-5 mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 font-mono text-[11px] leading-5 text-red-600">
               {error}
             </p>
           )}
 
-          <footer className="flex items-center justify-end gap-3 border-t border-line px-5 py-4">
+          <footer className="flex items-center justify-end gap-3 border-t border-slate-200 px-5 py-4">
             <button
               type="button"
               onClick={onCancel}
               disabled={busy}
-              className="border border-line px-4 py-2.5 font-mono text-[11px] uppercase tracking-[0.16em] text-muted transition-colors hover:border-wire hover:text-paper disabled:opacity-40"
+              className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition-all hover:bg-slate-50 disabled:opacity-40"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={busy}
-              className="bg-jade px-5 py-2.5 font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-ink-900 transition-colors hover:bg-jade-bright disabled:cursor-wait disabled:opacity-70"
+              className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-all hover:bg-blue-700 disabled:cursor-wait disabled:opacity-70"
             >
               {busy ? "Building PDF…" : "Generate & download"}
             </button>
@@ -483,6 +524,7 @@ function NexusDashboard() {
       ? seed
       : DEFAULT_HOPS;
   });
+  const [timeframe, setTimeframe] = useState("7d");
   const [editingHops, setEditingHops] = useState(false);
   const [hopDraft, setHopDraft] = useState(String(DEFAULT_HOPS));
 
@@ -515,8 +557,15 @@ function NexusDashboard() {
       try {
         const API_BASE_URL =
           process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+        let minTimestamp = 0;
+        const now = Math.floor(Date.now() / 1000);
+
+        if (timeframe === "24h") minTimestamp = now - 86400;
+        else if (timeframe === "7d") minTimestamp = now - 86400 * 7;
+        else if (timeframe === "30d") minTimestamp = now - 86400 * 30;
+
         const response = await fetch(
-          `${API_BASE_URL}/api/trace/${encodeURIComponent(target)}?max_hops=${maxHops}`,
+          `${API_BASE_URL}/api/trace/${encodeURIComponent(target)}?max_hops=${maxHops}&min_timestamp=${minTimestamp}`,
           { signal: controller.signal }
         );
         if (!response.ok) {
@@ -560,7 +609,7 @@ function NexusDashboard() {
       controller.abort();
       clearTimeout(timer);
     };
-  }, [target, reloadKey, maxHops]);
+  }, [target, reloadKey, maxHops, timeframe]);
 
   const elements = useMemo(() => {
     const nodeElements = graphData.nodes.map((node) => ({
@@ -662,6 +711,8 @@ function NexusDashboard() {
       graphData.edges.map((edge, index) => ({
         hop: edge.hop ?? index + 1,
         asset: edge.asset || "UNKNOWN",
+        amount: formatLedgerAmount(edge.valueRaw ?? "", edge.asset || "UNKNOWN"),
+        timestamp: formatLedgerDate(edge.timestamp ?? ""),
         from: edge.source,
         to: edge.target,
         hash: edge.hash || edge.id,
@@ -670,34 +721,34 @@ function NexusDashboard() {
   );
 
   const statusPill = loading
-    ? { text: "Tracing", cls: "border-seal/40 bg-seal/10 text-seal" }
+    ? { text: "Tracing", cls: "border-blue-200 bg-blue-50 text-blue-700" }
     : error
-      ? { text: "Fault", cls: "border-flag/40 bg-flag/10 text-flag" }
+      ? { text: "Fault", cls: "border-red-200 bg-red-50 text-red-600" }
       : vaspFound
-        ? { text: "VASP identified", cls: "border-jade/40 bg-jade/10 text-jade" }
+        ? { text: "VASP identified", cls: "border-emerald-200 bg-emerald-50 text-emerald-700" }
         : hasGraph
-          ? { text: "Inconclusive", cls: "border-line bg-ink-750 text-muted" }
-          : { text: "Idle", cls: "border-line bg-ink-750 text-faint" };
+          ? { text: "Inconclusive", cls: "border-slate-200 bg-slate-100 text-slate-600" }
+          : { text: "Idle", cls: "border-slate-200 bg-slate-100 text-slate-500" };
 
   /* ---- empty: no target ---- */
   if (!target) {
     return (
       <Shell target="" openedAt={openedAt}>
         <div className="mx-auto flex max-w-md flex-col items-center px-6 py-32 text-center">
-          <div className="border border-line bg-ink-800 px-8 py-10">
-            <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-faint">
+          <div className="rounded-xl border border-slate-200 bg-white px-8 py-10 shadow-sm">
+            <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-slate-500">
               No target loaded
             </p>
-            <h1 className="mt-4 font-display text-2xl font-bold tracking-tight text-paper">
+            <h1 className="mt-4 text-2xl font-bold tracking-tight text-slate-900">
               This console needs a suspect wallet.
             </h1>
-            <p className="mt-3 text-sm leading-6 text-muted">
+            <p className="mt-3 text-sm leading-6 text-slate-600">
               Start from the ingest bar to route a wallet through the tracing
               engine.
             </p>
             <Link
               href="/"
-              className="mt-6 inline-block bg-seal px-5 py-2.5 font-mono text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-900 transition-colors hover:bg-seal-bright"
+              className="mt-6 inline-block rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-all hover:bg-blue-700"
             >
               Go to ingest
             </Link>
@@ -709,19 +760,19 @@ function NexusDashboard() {
 
   return (
     <Shell target={target} openedAt={openedAt}>
-      <div className="mx-auto max-w-7xl px-6 pb-14 pt-8 lg:px-10">
+      <div className="mx-auto w-full max-w-[1600px] px-6 pb-14 pt-8 lg:px-16">
         {/* case header */}
-        <div className="flex flex-wrap items-end justify-between gap-4 border-b border-line pb-6">
+        <div className="flex flex-wrap items-end justify-between gap-4 border-b border-slate-200 pb-6">
           <div>
-            <p className="font-mono text-[10.5px] uppercase tracking-[0.26em] text-faint">
+            <p className="font-mono text-[10.5px] uppercase tracking-[0.26em] text-slate-500">
               Forensic console · {caseReference(target)}
             </p>
-            <h1 className="mt-2.5 font-display text-3xl font-bold tracking-tight text-paper">
+            <h1 className="mt-2.5 text-3xl font-bold tracking-tight text-slate-900">
               Transaction trace
             </h1>
           </div>
           <span
-            className={`border px-3.5 py-1.5 font-mono text-[10.5px] uppercase tracking-[0.18em] ${statusPill.cls}`}
+            className={`rounded border px-3 py-1 font-mono text-sm ${statusPill.cls}`}
           >
             {loading ? "● " : ""}
             {statusPill.text}
@@ -731,34 +782,34 @@ function NexusDashboard() {
         <div className="mt-8 grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
           {/* ---- left rail ---- */}
           <aside className="flex flex-col gap-6">
-            <section className="border border-line bg-ink-800">
-              <header className="border-b border-line px-5 py-3.5">
-                <h2 className="font-mono text-[10.5px] uppercase tracking-[0.2em] text-faint">
+            <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
+              <header className="border-b border-slate-200 px-5 py-3.5">
+                <h2 className="text-xs font-bold uppercase tracking-widest text-slate-500">
                   Trace parameters
                 </h2>
               </header>
-              <div className="divide-y divide-line px-5">
+              <div className="divide-y divide-slate-100 px-5">
                 <div className="flex items-center justify-between gap-3 py-2.5">
-                  <span className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-faint">
+                  <span className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-slate-500">
                     Target
                   </span>
                   <button
                     onClick={() => copy(target, "target")}
                     title="Copy full address"
-                    className="min-w-0 truncate font-mono text-[12.5px] text-paper transition-colors hover:text-seal"
+                    className="min-w-0 truncate font-mono text-[12.5px] text-slate-600 transition-colors hover:text-blue-600"
                   >
                     {copied === "target" ? "copied ✓" : shortenHash(target, 8, 6)}
                   </button>
                 </div>
                 <Field label="Chain">
                   {chain === "Unknown" ? (
-                    <span className="text-muted">unrecognized</span>
+                    <span className="text-slate-500">unrecognized</span>
                   ) : (
                     chain
                   )}
                 </Field>
                 <div className="flex items-center justify-between gap-3 py-2.5">
-                  <span className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-faint">
+                  <span className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-slate-500">
                     Max hops
                   </span>
                   {editingHops ? (
@@ -773,11 +824,11 @@ function NexusDashboard() {
                         autoFocus
                         aria-label="Maximum hops"
                         title={`Between ${MIN_HOPS} and ${MAX_HOPS} hops`}
-                        className="w-12 border border-line bg-ink-900 px-2 py-1 text-right font-mono text-[12.5px] text-paper focus:border-seal focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+                        className="w-12 rounded-lg border border-slate-300 bg-slate-50 px-2 py-1 text-right font-mono text-[12.5px] text-slate-900 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-600 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
                       />
                       <button
                         type="submit"
-                        className="border border-seal bg-seal/10 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.14em] text-seal transition-colors hover:bg-seal/20"
+                        className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition-all hover:bg-blue-700"
                       >
                         Apply
                       </button>
@@ -785,54 +836,73 @@ function NexusDashboard() {
                         type="button"
                         onClick={() => setEditingHops(false)}
                         aria-label="Cancel"
-                        className="border border-line px-2 py-1 font-mono text-[11px] leading-none text-faint transition-colors hover:text-paper"
+                        className="rounded-lg border border-slate-300 px-2 py-1 font-medium text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900"
                       >
                         ✕
                       </button>
                     </form>
                   ) : (
                     <div className="flex items-center gap-2">
-                      <span className="font-mono text-[12.5px] text-paper">{maxHops}</span>
+                      <span className="font-mono text-[12.5px] text-slate-700">{maxHops}</span>
                       <button
                         onClick={() => {
                           setHopDraft(String(maxHops));
                           setEditingHops(true);
                         }}
                         disabled={loading}
-                        className="border border-line px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-muted transition-colors hover:border-wire hover:text-paper disabled:cursor-not-allowed disabled:opacity-40"
+                        className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm transition-all hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
                       >
                         Change
                       </button>
                     </div>
                   )}
                 </div>
+                <div className="flex flex-col gap-2 py-3">
+                  <label
+                    htmlFor="incident-window"
+                    className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-slate-500"
+                  >
+                    Incident window
+                  </label>
+                  <select
+                    id="incident-window"
+                    value={timeframe}
+                    onChange={(event) => setTimeframe(event.target.value)}
+                    className="w-full rounded-lg border border-slate-300 bg-slate-50 px-2.5 py-2 font-mono text-[12px] text-slate-900 outline-none focus:border-transparent focus:ring-2 focus:ring-blue-600"
+                  >
+                    <option value="24h">Last 24 hours</option>
+                    <option value="7d">Last 7 days</option>
+                    <option value="30d">Last 30 days</option>
+                    <option value="all">All time (legacy)</option>
+                  </select>
+                </div>
                 <Field label="Dust filter">on</Field>
               </div>
             </section>
 
-            <section className="border border-line bg-ink-800">
-              <header className="border-b border-line px-5 py-3.5">
-                <h2 className="font-mono text-[10.5px] uppercase tracking-[0.2em] text-faint">
+            <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
+              <header className="border-b border-slate-200 px-5 py-3.5">
+                <h2 className="text-xs font-bold uppercase tracking-widest text-slate-500">
                   Legend
                 </h2>
               </header>
-              <ul className="space-y-3.5 px-5 py-4 text-[13px] text-muted">
+              <ul className="space-y-3.5 px-5 py-4 text-[13px] text-slate-700">
                 <li className="flex items-center gap-3">
-                  <span className="h-3 w-3 rounded-full bg-flag" /> Suspect wallet
+                  <span className="h-3 w-3 rounded-full bg-red-500" /> Suspect wallet
                 </li>
                 <li className="flex items-center gap-3">
-                  <span className="h-3 w-3 rounded-full bg-wire" /> Intermediary (mule)
+                  <span className="h-3 w-3 rounded-full bg-slate-400" /> Intermediary (mule)
                 </li>
                 <li className="flex items-center gap-3">
-                  <span className="h-3 w-3 bg-jade ring-1 ring-seal" /> Terminal VASP
+                  <span className="h-3 w-3 rounded-sm bg-emerald-500" /> Terminal VASP
                 </li>
               </ul>
             </section>
 
             {hopLog.length > 0 && (
-              <section className="border border-line bg-ink-800">
-                <header className="border-b border-line px-5 py-3.5">
-                  <h2 className="font-mono text-[10.5px] uppercase tracking-[0.2em] text-faint">
+              <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
+                <header className="border-b border-slate-200 px-5 py-3.5">
+                  <h2 className="text-xs font-bold uppercase tracking-widest text-slate-500">
                     Hop log
                   </h2>
                 </header>
@@ -840,13 +910,13 @@ function NexusDashboard() {
                   {hopLog.map((node, i) => (
                     <li
                       key={node.id}
-                      className="flex items-center gap-3 border-line py-2.5 [&:not(:last-child)]:border-b"
+                      className="flex items-center gap-3 border-slate-100 py-2.5 [&:not(:last-child)]:border-b"
                     >
-                      <span className="font-mono text-[11px] text-faint">
+                      <span className="font-mono text-[11px] text-slate-500">
                         {String(node.hop ?? i).padStart(2, "0")}
                       </span>
                       <span className={`h-2 w-2 shrink-0 rounded-full ${typeDot(node.type)}`} />
-                      <span className="min-w-0 truncate font-mono text-[12px] text-paper">
+                      <span className="min-w-0 truncate font-mono text-[12px] text-slate-600">
                         {displayLabel(node.label)}
                       </span>
                     </li>
@@ -858,30 +928,30 @@ function NexusDashboard() {
 
           {/* ---- main column ---- */}
           <div className="flex flex-col gap-6">
-            <section className="border border-line bg-ink-800">
-              <header className="flex items-center justify-between border-b border-line px-5 py-3.5">
-                <h2 className="font-mono text-[10.5px] uppercase tracking-[0.2em] text-faint">
+            <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+              <header className="flex items-center justify-between border-b border-slate-200 px-5 py-3.5">
+                <h2 className="text-xs font-bold uppercase tracking-widest text-slate-500">
                   Network view
                 </h2>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={fitGraph}
                     disabled={!hasGraph}
-                    className="border border-line px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-muted transition-colors hover:border-wire hover:text-paper disabled:opacity-40"
+                    className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition-all hover:bg-slate-50 disabled:opacity-40"
                   >
                     Fit
                   </button>
                   <button
                     onClick={() => cytoscapeRef.current?.center()}
                     disabled={!hasGraph}
-                    className="border border-line px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-muted transition-colors hover:border-wire hover:text-paper disabled:opacity-40"
+                    className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition-all hover:bg-slate-50 disabled:opacity-40"
                   >
                     Center
                   </button>
                 </div>
               </header>
 
-              <div className="relative dossier-grid bg-ink-850">
+              <div className="relative overflow-hidden rounded-b-xl border-t border-slate-200 bg-white shadow-inner" style={{ backgroundImage: "radial-gradient(#cbd5e1 1px, transparent 1px)", backgroundSize: "24px 24px" }}>
                 {/* graph */}
                 <CytoscapeGraph
                   elements={elements}
@@ -908,9 +978,9 @@ function NexusDashboard() {
 
                 {/* overlays */}
                 {loading && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-ink-900/85">
-                    <div className="h-8 w-8 animate-spin rounded-full border-2 border-line border-t-seal" />
-                    <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-faint">
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-white/85">
+                    <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-blue-600" />
+                    <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-slate-500">
                       Traversing the ledger…
                     </p>
                   </div>
@@ -918,21 +988,21 @@ function NexusDashboard() {
 
                 {!loading && error && (
                   <div className="absolute inset-0 flex items-center justify-center p-8">
-                    <div className="max-w-sm border border-flag/40 bg-ink-900/95 p-6 text-center">
-                      <p className="font-mono text-[10.5px] uppercase tracking-[0.22em] text-flag">
+                    <div className="max-w-sm rounded-xl border border-red-200 bg-white p-6 text-center shadow-xl">
+                      <p className="font-mono text-[10.5px] uppercase tracking-[0.22em] text-red-600">
                         Trace fault
                       </p>
-                      <p className="mt-3 text-[13.5px] leading-6 text-muted">{error}</p>
+                      <p className="mt-3 text-[13.5px] leading-6 text-slate-600">{error}</p>
                       <div className="mt-5 flex items-center justify-center gap-3">
                         <button
                           onClick={() => setReloadKey((k) => k + 1)}
-                          className="bg-seal px-4 py-2 font-mono text-[10.5px] font-semibold uppercase tracking-[0.16em] text-ink-900 transition-colors hover:bg-seal-bright"
+                          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-all hover:bg-blue-700"
                         >
                           Retry
                         </button>
                         <Link
                           href="/"
-                          className="border border-line px-4 py-2 font-mono text-[10.5px] uppercase tracking-[0.16em] text-muted transition-colors hover:border-wire hover:text-paper"
+                          className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition-all hover:bg-slate-50"
                         >
                           New target
                         </Link>
@@ -944,10 +1014,10 @@ function NexusDashboard() {
                 {!loading && !error && !hasGraph && (
                   <div className="absolute inset-0 flex items-center justify-center p-8">
                     <div className="max-w-sm text-center">
-                      <p className="font-mono text-[10.5px] uppercase tracking-[0.22em] text-faint">
+                      <p className="font-mono text-[10.5px] uppercase tracking-[0.22em] text-slate-500">
                         No outbound flow
                       </p>
-                      <p className="mt-3 text-[13.5px] leading-6 text-muted">
+                      <p className="mt-3 text-[13.5px] leading-6 text-slate-600">
                         The engine returned no transfers above the dust threshold
                         for this wallet. Try a different target or raise the hop
                         limit.
@@ -959,21 +1029,27 @@ function NexusDashboard() {
             </section>
 
             {ledgerEntries.length > 0 && (
-              <section className="border border-line bg-ink-800">
-                <header className="border-b border-line px-5 py-3.5">
-                  <h2 className="font-mono text-[10.5px] uppercase tracking-[0.2em] text-faint">
+              <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                <header className="border-b border-slate-200 px-5 py-3.5">
+                  <h2 className="text-xs font-bold uppercase tracking-widest text-slate-500">
                     Evidentiary Transaction Ledger
                   </h2>
                 </header>
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[760px] border-collapse text-left">
-                    <thead className="bg-[#111827] text-[#9CA3AF]">
-                      <tr className="border-b border-[#374151]">
+                    <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                      <tr>
                         <th className="px-4 py-3 font-mono text-[10px] font-bold uppercase tracking-[0.16em]">
                           Hop #
                         </th>
                         <th className="px-4 py-3 font-mono text-[10px] font-bold uppercase tracking-[0.16em]">
                           Asset
+                        </th>
+                        <th className="px-4 py-3 font-mono text-[10px] font-bold uppercase tracking-[0.16em]">
+                          Amount
+                        </th>
+                        <th className="px-4 py-3 font-mono text-[10px] font-bold uppercase tracking-[0.16em]">
+                          Date / Time
                         </th>
                         <th className="px-4 py-3 font-mono text-[10px] font-bold uppercase tracking-[0.16em]">
                           Source (From)
@@ -999,14 +1075,20 @@ function NexusDashboard() {
                             : `https://etherscan.io/tx/${entry.hash}`;
 
                         return (
-                          <tr key={`${entry.hash || entry.from}-${index}`} className="border-b border-[#374151] bg-[#111827]/40">
-                            <td className="px-4 py-3 font-mono text-[12px] text-paper">
+                          <tr key={`${entry.hash || entry.from}-${index}`} className="border-b border-slate-100 transition-colors hover:bg-slate-50/70">
+                            <td className="px-4 py-3 font-mono text-[12px] text-slate-700">
                               Hop {entry.hop}
                             </td>
                             <td className="px-4 py-3">
-                              <span className="inline-flex rounded border border-[#374151] bg-[#1F2937] px-2 py-1 font-mono text-[11px] text-paper">
+                              <span className="inline-flex rounded border border-blue-200 bg-blue-50 px-2 py-0.5 font-mono text-xs font-bold text-blue-700">
                                 {entry.asset.toUpperCase()}
                               </span>
+                            </td>
+                            <td className="px-4 py-3 font-mono text-[12px] font-bold text-slate-900">
+                              {entry.amount}
+                            </td>
+                            <td className="whitespace-nowrap px-4 py-3 font-mono text-[11px] text-slate-500">
+                              {entry.timestamp}
                             </td>
                             <td className="px-4 py-3">
                               <div className="flex items-center gap-2">
@@ -1014,7 +1096,7 @@ function NexusDashboard() {
                                   type="button"
                                   onClick={() => copy(entry.from, fromKey)}
                                   title="Copy source address"
-                                  className="font-mono text-[12px] text-paper transition-colors hover:text-seal"
+                                  className="font-mono text-[12px] text-slate-600 transition-colors hover:text-blue-600"
                                 >
                                   {copied === fromKey ? "Copied!" : shortenHash(entry.from, 6, 4)}
                                 </button>
@@ -1027,7 +1109,7 @@ function NexusDashboard() {
                                   onClick={() => copy(entry.to, toKey)}
                                   title="Copy recipient address"
                                   className={`font-mono text-[12px] transition-colors ${
-                                    isMatchedRecipient ? "text-jade hover:text-jade-bright" : "text-paper hover:text-seal"
+                                    isMatchedRecipient ? "text-emerald-600 hover:text-emerald-700" : "text-slate-600 hover:text-blue-600"
                                   }`}
                                 >
                                   {copied === toKey ? "Copied!" : shortenHash(entry.to, 6, 4)}
@@ -1040,7 +1122,7 @@ function NexusDashboard() {
                                   type="button"
                                   onClick={() => copy(entry.hash, hashKey)}
                                   title="Copy transaction hash"
-                                  className="font-mono text-[12px] text-paper transition-colors hover:text-seal"
+                                  className="font-mono text-[12px] text-slate-600 transition-colors hover:text-blue-600"
                                 >
                                   {copied === hashKey ? "Copied!" : shortenHash(entry.hash, 8, 6)}
                                 </button>
@@ -1049,7 +1131,7 @@ function NexusDashboard() {
                                   target="_blank"
                                   rel="noreferrer"
                                   aria-label={`Open transaction on explorer`}
-                                  className="inline-flex h-5 w-5 items-center justify-center rounded border border-[#374151] text-[10px] text-[#9CA3AF] transition-colors hover:border-seal hover:text-seal"
+                                  className="inline-flex h-5 w-5 items-center justify-center rounded border border-slate-200 text-[10px] text-slate-500 transition-colors hover:border-blue-600 hover:text-blue-600"
                                 >
                                   ↗
                                 </a>
@@ -1067,17 +1149,14 @@ function NexusDashboard() {
             {/* ---- terminal VASP / seizure ---- */}
             {!loading && !error && (
               <section
-                className={
-                  "border bg-ink-800 " +
-                  (vaspFound ? "border-seal/50" : "border-line")
-                }
+                className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
               >
-                <header className="flex items-center justify-between border-b border-line px-5 py-3.5">
-                  <h2 className="font-mono text-[10.5px] uppercase tracking-[0.2em] text-faint">
+                <header className="flex items-center justify-between border-b border-slate-200 px-5 py-3.5">
+                  <h2 className="text-xs font-bold uppercase tracking-widest text-slate-500">
                     Terminal VASP
                   </h2>
                   {vaspFound && (
-                    <span className="evidence-stamp bg-ink-900 px-2.5 py-1 font-mono text-[9.5px] font-semibold uppercase">
+                    <span className="rounded border border-blue-200 bg-blue-50 px-2.5 py-1 font-mono text-[9.5px] font-semibold uppercase text-blue-700">
                       Flagged · Seizure
                     </span>
                   )}
@@ -1096,14 +1175,14 @@ function NexusDashboard() {
                         {meta.terminalVasp.detected_at_hop ?? meta.hops ?? "—"}
                       </Field>
                       <div className="flex items-center justify-between gap-3 py-2.5">
-                        <span className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-faint">
+                        <span className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-slate-500">
                           Matched address
                         </span>
                         <button
                           onClick={() =>
                             copy(meta.terminalVasp?.matched_address ?? "", "matched")
                           }
-                          className="min-w-0 truncate font-mono text-[12.5px] text-paper transition-colors hover:text-seal"
+                          className="min-w-0 truncate font-mono text-[12.5px] text-slate-600 transition-colors hover:text-blue-600"
                           title="Copy address"
                         >
                           {copied === "matched"
@@ -1113,43 +1192,43 @@ function NexusDashboard() {
                       </div>
                     </div>
 
-                    <div className="mt-4 border-t border-line pt-5">
+                    <div className="mt-4 border-t border-slate-200 pt-5">
                       <div className="flex flex-wrap items-center gap-3">
                         <button
                           onClick={() => {
                             setExportError(null);
                             setShowModal(true);
                           }}
-                          className="bg-jade px-5 py-2.5 font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-ink-900 transition-colors hover:bg-jade-bright"
+                          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-all hover:bg-blue-700"
                         >
                           Export §94 BNSS notice (PDF)
                         </button>
                         <button
                           onClick={() => setShowNotice((s) => !s)}
-                          className="border border-line px-4 py-2.5 font-mono text-[11px] uppercase tracking-[0.16em] text-muted transition-colors hover:border-seal hover:text-seal"
+                          className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition-all hover:bg-slate-50"
                         >
                           {showNotice ? "Hide preview" : "Preview text"}
                         </button>
                       </div>
-                      <p className="mt-3 font-mono text-[10.5px] uppercase tracking-[0.14em] text-faint">
+                      <p className="mt-3 font-mono text-[10.5px] uppercase tracking-[0.14em] text-slate-500">
                         Asks for FIR and officer details before download
                       </p>
                     </div>
 
                     {showNotice && meta && (
-                      <div className="mt-4 border border-line bg-ink-900">
-                        <div className="flex items-center justify-between border-b border-line px-4 py-2.5">
-                          <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-seal">
+                      <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50">
+                        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-2.5">
+                          <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-blue-600">
                             Draft · Section 94 BNSS
                           </span>
                           <button
                             onClick={() => copy(draftNotice(meta, openedAt), "notice")}
-                            className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted transition-colors hover:text-paper"
+                            className="font-mono text-[10px] uppercase tracking-[0.16em] text-slate-500 transition-colors hover:text-slate-900"
                           >
                             {copied === "notice" ? "copied ✓" : "copy"}
                           </button>
                         </div>
-                        <pre className="overflow-x-auto whitespace-pre-wrap px-4 py-4 font-mono text-[12px] leading-6 text-muted">
+                        <pre className="overflow-x-auto whitespace-pre-wrap px-4 py-4 font-mono text-[12px] leading-6 text-slate-600">
                           {draftNotice(meta, openedAt)}
                         </pre>
                       </div>
@@ -1157,7 +1236,7 @@ function NexusDashboard() {
                   </div>
                 ) : (
                   <div className="px-5 py-6">
-                    <p className="text-[13.5px] leading-6 text-muted">
+                    <p className="text-[13.5px] leading-6 text-slate-600">
                       {hasGraph
                         ? "No known exchange wallet was reached within the hop limit. Raise max hops or extend the VASP registry to resolve a terminal endpoint."
                         : "Run a trace to resolve the terminal exchange."}
@@ -1195,17 +1274,36 @@ function Shell({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen overflow-x-hidden bg-ink-900 text-paper">
-      <SiteNav
-        active="trace"
-        stripItems={[
-          { label: "Restricted" },
-          { label: "Case", value: target ? caseReference(target) : "—" },
-          { label: "Target", value: target ? shortenHash(target) : "none" },
-        ]}
-        stripRight={openedAt ? `Opened ${openedAt}` : undefined}
-      />
-      <div className="pt-24">{children}</div>
+    <div className="min-h-screen overflow-x-hidden bg-slate-50 text-slate-900">
+      <header className="sticky top-0 z-40 border-b border-slate-200 bg-white shadow-sm">
+        <div className="mx-auto flex min-h-16 w-full max-w-[1600px] flex-wrap items-center justify-between gap-3 px-6 py-3 lg:px-16">
+          <Link href="/" aria-label="NEXUS home" className="select-none">
+            <div className="flex items-center gap-3 select-none">
+              <div className="relative flex h-8 w-8 items-center justify-center">
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" className="absolute inset-0" aria-hidden="true">
+                  <circle cx="16" cy="16" r="14" stroke="#CBD5E1" strokeWidth="1.5" strokeDasharray="3 3" />
+                  <circle cx="16" cy="2" r="2" fill="#2563EB" />
+                  <circle cx="29.8" cy="12" r="2" fill="#2563EB" />
+                  <circle cx="2.2" cy="12" r="2" fill="#2563EB" />
+                  <circle cx="24.4" cy="27.3" r="2" fill="#10B981" />
+                  <circle cx="7.6" cy="27.3" r="2" fill="#10B981" />
+                  <path d="M12 21V11L20 21V11" stroke="#0F172A" strokeWidth="2.5" strokeLinecap="square" strokeLinejoin="miter" />
+                </svg>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-lg font-extrabold leading-none tracking-[0.15em] text-slate-900">NEXUS</span>
+              </div>
+            </div>
+          </Link>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <span className="text-xs font-bold uppercase tracking-widest text-blue-600">Restricted</span>
+            <span className="rounded border border-slate-200 bg-slate-100 px-3 py-1 font-mono text-sm text-slate-700">Case: {target ? caseReference(target) : "—"}</span>
+            <span className="rounded border border-slate-200 bg-slate-100 px-3 py-1 font-mono text-sm text-slate-700">Target: {target ? shortenHash(target) : "none"}</span>
+            {openedAt && <span className="hidden text-xs text-slate-500 lg:inline">Opened {openedAt}</span>}
+          </div>
+        </div>
+      </header>
+      <div>{children}</div>
     </div>
   );
 }
@@ -1214,7 +1312,7 @@ export default function TracePage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center bg-ink-900 font-mono text-[11px] uppercase tracking-[0.2em] text-faint">
+        <div className="flex min-h-screen items-center justify-center bg-slate-50 font-mono text-[11px] uppercase tracking-[0.2em] text-slate-500">
           Loading console…
         </div>
       }

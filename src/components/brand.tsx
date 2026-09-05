@@ -70,7 +70,7 @@ export function ClassificationStrip({
         className
       )}
     >
-      <div className="mx-auto flex h-8 max-w-7xl items-center gap-4 overflow-hidden px-6 lg:px-10">
+      <div className="mx-auto flex h-8 w-full max-w-[1600px] items-center gap-4 overflow-hidden px-6 lg:px-16">
         <span className="h-2 w-2 shrink-0 bg-seal" aria-hidden />
         <div className="flex min-w-0 items-center gap-4 font-mono text-[10.5px] uppercase tracking-[0.2em] text-faint">
           {items.map((item, i) => (
@@ -117,7 +117,7 @@ export function SiteNav({
   return (
     <header className="fixed inset-x-0 top-0 z-50">
       <nav className="border-b border-line bg-ink-900/80 backdrop-blur-xl">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6 lg:px-10">
+        <div className="mx-auto flex h-16 w-full max-w-[1600px] items-center justify-between px-6 lg:px-16">
           <Link href="/" aria-label="NEXUS home" className="outline-none">
             <Wordmark />
           </Link>
